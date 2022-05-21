@@ -25,7 +25,7 @@ void dodBCD()
 	{
 		unsigned char lower_byte = first[first_byte_size] & 0x0f;
 		unsigned char upper_byte = first[first_byte_size] & 0xf0;
-		if (upper_byte == 0xf0)
+		if (upper_byte >= 0xf0)
 		{
 			++first_byte_size;
 			++first_half_byte_size;
@@ -45,7 +45,7 @@ void dodBCD()
 	{
 		unsigned char lower_byte = second[second_byte_size] & 0x0f;
 		unsigned char upper_byte = second[second_byte_size] & 0xf0;
-		if (upper_byte == 0xf0)
+		if (upper_byte >= 0xf0)
 		{
 			++second_byte_size;
 			++second_half_byte_size;
