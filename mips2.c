@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <stdint.h>
 
-unsigned char first[] = {0x32,0x1f};
-unsigned char second[] = {0x01, 0x9f};
+unsigned char first[] = {0x22,0x5f};
+unsigned char second[] = {0x22, 0xf0};
 
 void dodBCD();
 
@@ -63,35 +63,9 @@ void dodBCD()
 
 	/*KONIEC MIERZENIA*/
 
-	/*Potencjalna wieksza tablicy w razie przeniesienia bitu*/
-	int carry_over_size;
-
-	if (first_byte_size > second_byte_size)
-	{
-		if (first_half_byte_size%2 != 0)
-		{
-			carry_over_size = first_byte_size+1;
-		}
-		else
-		{
-			carry_over_size = first_byte_size+2;
-		}
-	}
-	else
-	{
-		if (second_half_byte_size%2 != 0)
-		{
-			carry_over_size = second_byte_size+1;
-		}
-		else
-		{
-			carry_over_size = second_byte_size+2;
-		}
-	}
-	/*KONIEC*/
-
 	/*DODAWANIE*/
-
+	int half_byte_max_size = first_half_byte_size > second_half_byte_size
+							? first_half_byte_size : second_half_byte_size;
 	int max_size = first_byte_size > second_byte_size
 						? first_byte_size : second_byte_size;
 	int min_size = first_byte_size < second_byte_size
@@ -101,6 +75,69 @@ void dodBCD()
 	unsigned char result[max_size];
 
 	unsigned char carry_over = 0x00;
+
+	if (half_byte_max_size%2 != 0)
+		--max_size;
+
+	for (--half_byte_max_size; max_size > 0;)
+	{
+		unsigned char first_value = 0x00;
+		unsigned char second_value = 0x00;
+
+		while (first_value != 0xf0 > first_byte_size > 0)
+		{
+			if (first_half_byte_size%2 == 0)
+			{
+				first_value = first[first_byte_size-1] & 0x0f;
+				--first_half_byte_size;
+			}
+			else
+			{
+				first_value = first[first_byte_size-1] & 0xf0;
+				first_value >>= 4;
+				--first_half_byte_size;
+				--first_byte_size;
+			}
+		}
+
+		while (second_value != 0xf0 && second_byte_size > 0)
+		{
+			if (second_half_byte_size%2 == 0)
+			{
+				second_value = second[second_byte_size-1] & 0x0f;
+				--second_half_byte_size;
+			}
+			else
+			{
+				second_value = second[second_byte_size-1] & 0xf0;
+				second_value >>= 4;
+				--second_half_byte_size;
+				--second_byte_size;
+			}
+		}
+
+		unsigned char sum = first_value + second_value + carry_over;
+		carry_over = 0x00;
+
+		if (sum > 0x09)
+		{
+			carry_over = 0x01;
+			sum += 0x06;
+			sum -= 0x10;
+		}
+
+		if (half_byte_max_size%2 == 0)
+		{
+			result[max_size-1] = sum;
+			--half_byte_max_size;
+		}
+		else
+		{
+			result[max_size-1] += sum ;
+			--half_byte_max_size;
+			--max_size;
+		}
+	}
 
 	for (; min_size>0; --first_byte_size, --second_byte_size, --min_size, --max_size)
 	{
@@ -163,6 +200,7 @@ void dodBCD()
 
 	while (first_byte_size > 0)
 	{
+		printf("%s\n", "HERE");
 		unsigned char lower_first = first[first_byte_size-1] & 0x0f;
 		unsigned char upper_first = first[first_byte_size-1] & 0xf0;
 		upper_first >>= 4;
@@ -199,6 +237,7 @@ void dodBCD()
 		upper_sum <<= 4;
 
 		result[first_byte_size-1] = upper_sum | lower_sum;
+		--first_byte_size;
 	}
 
 	while (second_byte_size > 0)
@@ -239,57 +278,55 @@ void dodBCD()
 		upper_sum <<= 4;
 
 		result[second_byte_size-1] = upper_sum | lower_sum;
+		--second_byte_size;
 	}
 
 	/*PRZESUNIECIE W PRZYPADKU CARRY_OVER=1*/
-	unsigned char result2[carry_over_size];
+	int max_half_byte_size = first_half_byte_size > second_half_byte_size
+							? first_half_byte_size : second_half_byte_size;
 	int i,x,y;
 	if (carry_over != 0x00)
 	{
-		if (first_byte_size > second_byte_size)
+		int carry_over_size = max_half_byte_size%2 == 0
+							? max_size_for_later+1 : max_size_for_later;
+		unsigned char result2[carry_over_size];
+		if (max_half_byte_size%2 == 0)
 		{
-			if (first_half_byte_size%2 != 0)
+			unsigned char next = 0x00;
+			for (i=carry_over_size-1; i > 0; --i)
 			{
-				for (i=1; i <= max_size_for_later+1; ++i)
-					result2[i] = result[i-1];
-				result2[0] = carry_over;
+				unsigned char lower_byte = result[i-1] & 0x0f;
+				unsigned char upper_byte = result[i-1] & 0xf0;
+				upper_byte >>= 4;
+				lower_byte <<= 4;
+				result2[i] = lower_byte | next;
+				next = upper_byte;
 			}
-			else
-			{
-				unsigned char save = 0x10;
-				for (i=1; i <= max_size_for_later+1; ++i)
-				{
-					unsigned char lower_byte = result[i] & 0x0f;
-					unsigned char upper_byte = result[i] & 0xf0;
-					upper_byte >>= 4;
-					result2[i] = save | upper_byte;
-					save = lower_byte;
-				}
-			}
+			result2[0] = 0x10 | next;
 		}
 		else
 		{
-			if (second_half_byte_size%2 != 0)
+			unsigned char prev = 0x10;
+			for (i=0; i < carry_over_size; ++i)
 			{
-				for (i=1; i <= max_size_for_later+1; ++i)
-					result2[i] = result[i-1];
-				result2[0] = carry_over;
-			}
-			else
-			{
-				unsigned char save = 0x10;
-				for (i=1; i <= max_size_for_later+1; ++i)
-				{
-					unsigned char lower_byte = result[i] & 0x0f;
-					unsigned char upper_byte = result[i] & 0xf0;
-					upper_byte >>= 4;
-					result2[i] = save | upper_byte;
-					save = lower_byte;
-				}
+				unsigned char lower_byte = result[i] & 0x0f;
+				unsigned char upper_byte = result[i] & 0xf0;
+				upper_byte >>= 4;
+				result2[i] = prev | upper_byte;
+				prev = lower_byte;
 			}
 		}
 
-		for (y=carry_over_size; y-- > 0; )
+		if (max_half_byte_size%2 != 0)
+		{
+			result2[carry_over_size-1] += 0x0f;
+		}
+		else
+		{
+			result2[carry_over_size-1] = 0xf0;
+		}
+
+		for (y=0; y < carry_over_size; ++y)
 		{
 			for (x=0; x < 8; ++x)
 			{
@@ -307,27 +344,13 @@ void dodBCD()
 	/*KONIEC DODAWANIA RESZTY*/
 
 	/*0xF0 lub 0x0F na koncu*/
-	if (first_byte_size > second_byte_size)
+	if (max_half_byte_size%2 != 0)
 	{
-		if (first_half_byte_size%2 != 0)
-		{
-			result[max_size_for_later-1] = 0xf0;
-		}
-		else
-		{
-			result[max_size_for_later-1] += 0x0f;
-		}
+		result[max_size_for_later-1] = 0xf0;
 	}
 	else
 	{
-		if (second_half_byte_size%2 != 0)
-		{
-			result[max_size_for_later-1] = 0xf0;
-		}
-		else
-		{
-			result[max_size_for_later-1] += 0x0f;
-		}
+		result[max_size_for_later-1] += 0x0f;
 	}
 	/*KONIEC*/
 
