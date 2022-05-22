@@ -82,44 +82,42 @@ void dodBCD()
 	if (half_byte_max_size%2 != 0)
 		--max_size;
 
-	for (--half_byte_max_size; max_size > 0;)
+	for (--half_byte_max_size; half_byte_max_size > 0;)
 	{
 		unsigned char first_value = 0x00;
 		unsigned char second_value = 0x00;
 
-		while (first_byte_size > 0)
+		while (first_half_byte_size > 0)
 		{		
 			if (first_half_byte_size%2 == 0)
 			{
 				first_value = first[first_byte_size-1] & 0x0f;
-				--first_half_byte_size;
 			}
 			else
 			{
 				first_value = first[first_byte_size-1] & 0xf0;
 				first_value >>= 4;
-				--first_half_byte_size;
 				--first_byte_size;
 			}
+			--first_half_byte_size;
 			if (first_value != 0x0f)
 				break;
 			first_value = 0x00;
 		}
 
-		while (second_byte_size > 0)
+		while (second_half_byte_size > 0)
 		{
 			if (second_half_byte_size%2 == 0)
 			{
 				second_value = second[second_byte_size-1] & 0x0f;
-				--second_half_byte_size;
 			}
 			else
 			{
 				second_value = second[second_byte_size-1] & 0xf0;
 				second_value >>= 4;
-				--second_half_byte_size;
 				--second_byte_size;
 			}
+			--second_half_byte_size;
 			if (second_value != 0x0f)
 				break;
 			second_value = 0x00;
