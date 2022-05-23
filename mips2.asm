@@ -1,6 +1,6 @@
 .data
-	first: .byte 0x1f
-	second: .byte 0x4f
+	first: .byte 0x11, 0xf0
+	second: .byte 0x19, 0xf0
 	result: .byte 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 	len: .byte 0
 	carry: .byte 0
@@ -105,20 +105,23 @@ end_if_else_max_2:
 	divu $t2, $0, 2
 	mfhi $t3
 
-	# JEZELI NIE PARZYSTE ZMNIEJSZAMY MAX BYTE SIZE
+	# JEZELI NIEPARZYSTE ZMNIEJSZAMY MAX BYTE SIZE
 	beq $t3, 0, if_else_half_even
 	
-	subi $t1, $t1, 1
+	subiu $t1, $t1, 1
 			
 if_else_half_even:
 
+	subiu $t1, $t1, 1 # zamiana sizu na indeks
+
 	la $t2, result # adres wyniku
 	addu $t2, $t2, $t1 # przejscie na koniec wyniku
-	subiu $t0, $t0, 1
+	subiu $t0, $t0, 1 # miejsce na koniec liczby
 	
 	li $t7, 0 # dlugosci sie zwolily bo mam adresy
 	li $t5, 0 
 	li $t1, 0
+	
 	# t7 to carry_over
 	
 add_loop:
@@ -129,7 +132,7 @@ first_inner_loop:
 	
 	divu $t3, $t6, 2
 	mfhi $t3
-	beq $t3, 1, not_even_in_inner_inner_loop # sprawdzam parzystosc half byte
+	beq $t3, 1, not_even_in_inner_inner_loop # sprawdzam parzystosc half
 	lbu $t3, 0($a0)
 	andi $t3, $t3, 0x0000000f # gdy lower half byte
 	j after_not_even_in_inner_inner_loop
@@ -142,7 +145,7 @@ not_even_in_inner_inner_loop:
 
 after_not_even_in_inner_inner_loop:
 	subiu $t6, $t6, 1
-	bne $t3, 0x0000000f, end_first_inner_loop # jezeli nie 0x0f pop. wart
+	bne $t3, 0x0000000f, end_first_inner_loop # jezeli nie 0x0f pop. wart.
 	li $t3, 0
 	j first_inner_loop
 	
@@ -155,7 +158,7 @@ second_inner_loop:
 	
 	divu $t3, $t4, 2
 	mfhi $t3
-	beq $t3, 1, not_even_in_inner_inner_loop_2 # sprawdzam parzystosc half byte
+	beq $t3, 1, not_even_in_inner_inner_loop_2 # sprawdzam parzystosc half
 	lbu $t3, 0($a1)
 	andi $t3, $t3, 0x0000000f
 	j after_not_even_in_inner_inner_loop_2
@@ -168,7 +171,7 @@ not_even_in_inner_inner_loop_2:
 	
 after_not_even_in_inner_inner_loop_2:
 	subiu $t4, $t4, 1
-	bne $t3, 0x0000000f, end_second_inner_loop # jezeli nie 0x0f pop. wart
+	bne $t3, 0x0000000f, end_second_inner_loop # jezeli nie 0x0f pop. wart.
 	li $t3, 0
 	j second_inner_loop
 	
@@ -194,24 +197,98 @@ skip_fix:
 	
 max_half_byte_size_not_even:
 	sll $t5, $t5, 4
-	lbu $t1, 0($t2)
-	or $t5, $t5, $t1 # adjust i dodawanie upper byte
+	lbu $a3, 0($t2)
+	or $t5, $t5, $a3 # adjust i dodawanie upper byte
 	sb $t5, 0($t2) # zapisanie wyniku
 	subiu $t2, $t2, 1
 
 max_half_byte_size_not_even_skip:
 
-	subiu $t0, $t0, 1 # odjecie jednego half byte
+	subiu $t0, $t0, 1 # odjecie jednego max half byte
 	j add_loop
 	
 end_add_loop:
 
 	addiu $t2, $t2, 1 # naprawiam - wskazuje teraz na indeks 0
+	
+	# Wolne rejestry
+	# t7 ma carry_over
+	li $t5, 0
+	li $t3, 0
+	li $t1, 0
+	li $t0, 0
 
+	# SHIFTING
+
+shifting:
+	beq $t7, 0, end_shifting # jezeli nie ma nic do przeniesienia, nie ma shiftu
+
+end_shifting:
+
+	# KONIEC SHIFTINGU
+
+	# FIX - DODANIE f NA KONCU
+	
+	move $t0, $s0 # max half byte size
+	move $t1, $s1 # max byte size
+	subiu $t1, $t1, 1 # zamiana sizu na indeks
+	addu $t2, $t2, $t1 # wskazuje na koniec wyniku
+	
+	divu $t0, $t0, 2
+	mfhi $t0
+	
+	beq $t0, 0, even_fix_f # jezeli jest parzysty dodajemy f na koniec
+	li $t0, 0x000000f0 # jezeli nie, na poczatek
+	sb $t0, 0($t2)
+	j end_even_fix_f
+	
+even_fix_f:
+	li $t0, 0
+	lbu $t0, 0($t2)
+	ori $t0, $t0, 0x0000000f
+	sb $t0, 0($t2)
+
+end_even_fix_f:
+
+	subu $t2, $t2, $t1 # poczatek arraya
+
+	# KONIEC FIXA
+	
+	# METODA DO WYSWIETLANIA BCD
+	
+	addiu $t1, $t1, 1 # znowu size zamiast indeksu
+
+print_loop:
+	bleu $t1, 0, print_loop_end
+	
+	li $t0, 0
+inner_print_loop:
+	bgeu $t0, 8, inner_print_loop_end
+	lbu $t3, 0($t2) # wczytuje bajt wyniku
+	li $t5, 0
+	subu $t5, $t0, 7
+	mul $t5, $t5, -1
+	srlv $t3, $t3, $t5 # shift zeby zostal jeden bit
+	andi $t3, $t3, 0x00000001 # wybiera bit
+	addiu $t0, $t0, 1
+	
 	li $v0, 1
-	lbu $a0, 0($t2)
+	move $a0, $t3
 	syscall
 	
+	j inner_print_loop
+
+inner_print_loop_end:
+
+	addiu $t2, $t2, 1 # przejscie do kolejnego bajtu
+	subiu $t1, $t1, 1
+	
+	j print_loop
+	
+print_loop_end:
+
+	# KONIEC METODY
+
 	li $v0, 10
 	syscall
 	

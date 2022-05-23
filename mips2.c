@@ -209,8 +209,6 @@ void dodBCD()
 	}
 	/*KONIEC PRZESUNIECIA*/
 
-	/*KONIEC DODAWANIA RESZTY*/
-
 	/*0xF0 lub 0x0F na koncu*/
 	if (half_byte_max_size_for_latter%2 != 0)
 	{
