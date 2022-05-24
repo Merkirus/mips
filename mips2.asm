@@ -1,6 +1,6 @@
 .data
-	first: .byte 0x11, 0xf0
-	second: .byte 0x19, 0xf0
+	first: .byte 0x95, 0x6f
+	second: .byte 0x44, 0xf0
 	result: .byte 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 	len: .byte 0
 	carry: .byte 0
@@ -153,6 +153,7 @@ end_first_inner_loop:
 	
 	move $t5, $t3 # pierwsza czesc dodawania
 	
+	li $t3, 0
 second_inner_loop:
 	bleu $t4, 0, end_second_inner_loop # gdy half byte size 0 koniec liczby
 	
@@ -219,9 +220,91 @@ end_add_loop:
 	li $t0, 0
 
 	# SHIFTING
+	
+	move $t0, $s0 # max half byte size
+	move $t1, $s1 # max byte size
+	addu $t5, $zero, $t0
+	addu $t3, $zero, $t1
+	move $s0, $t5
+	move $s1, $t3
+	li $t5, 0
+	li $t3, 0
 
 shifting:
 	beq $t7, 0, end_shifting # jezeli nie ma nic do przeniesienia, nie ma shiftu
+	
+	move $s7, $t7 # zachowuje carry_over na pozniej
+	li $t7, 0
+	addu $t7, $t7, $t1 # na wszelki wypadek do poprawki indesku po nieparzystym przesuwaniu
+	
+	divu $t0, $t0, 2
+	mfhi $t0
+	bne $t0, 0, not_even_shifting
+	
+	addiu $t1, $t1, 1 # jezeli liczba parzysta zwiekszamy wielkosc o jeden
+	li $t5, 0
+	addu $t5, $zero, $t1
+	move $s1, $t5 # poprawka do wielkosci
+	li $t5, 0
+	
+	li $t3, 0 # tu przechowujemy zmienna tymczasowa
+	subiu $t1, $t1, 1 # do iteracji zamieniamy size na indeks
+	addu $t2, $t2, $t1 # ostatnia pozycja w tablicy
+	
+even_shifting_loop:
+	bleu $t1, 0, end_even_shifting_loop
+	
+	subiu $t2, $t2, 1
+	lbu $t0, 0($t2) # lower byte
+	lbu $t5, 0($t2) # upper byte
+	addiu $t2, $t2, 1
+	
+	andi $t0, $t0, 0x0000000f
+	andi $t5, $t5, 0x000000f0
+	srl $t5, $t5, 4
+	sll $t0, $t0, 4
+	or $t0, $t0, $t3
+	sb $t0, 0($t2)
+	move $t3, $t5
+	
+	subiu $t2, $t2, 1
+	subiu $t1, $t1, 1
+
+	j even_shifting_loop
+	
+end_even_shifting_loop:
+	# wychodzimy z petli z indeksem 0
+	or $t3, $t3, 0x00000010
+	sb $t3, 0($t2)
+
+	j end_shifting
+	
+not_even_shifting:
+
+	li $t3, 0x00000010 # tu przechowujemy zmienna tymczasowa
+not_even_shifting_loop:
+	bleu $t1, 0, end_not_even_shifting_loop
+	
+	lbu $t0, 0($t2) # lower byte
+	lbu $t5, 0($t2) # upper byte
+	
+	andi $t0, $t0, 0x0000000f
+	andi $t5, $t5, 0x000000f0
+	
+	srl $t5, $t5, 4
+	or $t5, $t5, $t3
+	sb $t5, 0($t2)
+	move $t3, $t0
+	
+	subiu $t1, $t1, 1
+	addiu $t2, $t2, 1
+	
+	j not_even_shifting_loop
+	
+end_not_even_shifting_loop:
+
+	# poprawka do indeksu tablicy
+	subu $t2, $t2, $t7
 
 end_shifting:
 
@@ -231,6 +314,8 @@ end_shifting:
 	
 	move $t0, $s0 # max half byte size
 	move $t1, $s1 # max byte size
+	move $t7, $s7 # carry_over
+	
 	subiu $t1, $t1, 1 # zamiana sizu na indeks
 	addu $t2, $t2, $t1 # wskazuje na koniec wyniku
 	
@@ -238,11 +323,19 @@ end_shifting:
 	mfhi $t0
 	
 	beq $t0, 0, even_fix_f # jezeli jest parzysty dodajemy f na koniec
+	beq $t7, 1, carry_over_uneven_fix_f
+
+
+carry_over_even_fix_f:
 	li $t0, 0x000000f0 # jezeli nie, na poczatek
 	sb $t0, 0($t2)
 	j end_even_fix_f
 	
+carry_over_uneven_fix_f:
+	li $t7, 0
 even_fix_f:
+	beq $t7, 1, carry_over_even_fix_f
+	li $t7, 0
 	li $t0, 0
 	lbu $t0, 0($t2)
 	ori $t0, $t0, 0x0000000f
