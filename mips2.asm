@@ -1,11 +1,189 @@
 .data
-	first: .byte 0x95, 0x6f
-	second: .byte 0x44, 0xf0
+	first: .byte 0x00, 0x4f
+	second: .byte 0x15, 0xf0, 0xf0
 	result: .byte 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-	len: .byte 0
-	carry: .byte 0
 
-.text
+.text	
+	# USUWANIE NIEZNACZACYCH ZER
+
+	la $a0, first # adres elementu w first
+	la $a1, second # adres elementu w second
+
+	li $t0, 0 # parzystosc
+	li $t1, 0 # temp
+	
+inf_pre_loop_1:
+	bne $t0, 0, end_inf_pre_loop_1
+	
+	lbu $t1, 0($a0)
+
+	li $t2, 0 # lower byte
+	li $t3, 0 # upper byte
+	andi $t2, $t1, 0x0000000f
+	andi $t3, $t1, 0x000000f0
+
+	# jezeli upper to liczba to koniec
+	beq $t3, 0, inf_pre_else_upper_1
+
+	j end_inf_pre_loop_1
+
+inf_pre_else_upper_1:
+
+	# jezeli jest liczba to trzeba shift left
+	beq $t2, 0, inf_pre_else_lower_1
+
+	li $t0, 1
+
+	j end_inf_pre_loop_1
+
+inf_pre_else_lower_1:
+
+	addiu $a0, $a0, 1
+
+	j inf_pre_loop_1
+
+end_inf_pre_loop_1:
+
+	li $t7, 0 # zmienna tymczasowa
+	lbu $t7, 0($a0)
+	andi $t7, $t7, 0x0000000f
+	li $t6, 0 # licznik przesuniec adresu
+
+half_byte_shifting_loop_1:
+	beq $t0, 0, end_half_byte_shifting_loop_1
+
+	addiu $a0, $a0, 1 # bierzemy nastepny bajt
+
+	lbu $t1, 0($a0)
+	li $t2, 0 # lower byte
+	li $t3, 0 # upper byte
+	andi $t2, $t1, 0x0000000f
+	andi $t3, $t1, 0x000000f0
+
+	srl $t3, $t3, 4
+
+	subiu $a0, $a0, 1 # cofamy sie aby przelozyc cyfry
+
+	sll $t7, $t7, 4 # przesuwamy przenoszona cyfre na upper
+
+	or $t7, $t7, $t3 # suma przenoszonej cyfry i upperbytu pop.
+
+	sb $t7, 0($a0)
+
+	# jezeli upper jest f to koniec liczby
+if_upper_byte_is_f_1:
+	beq $t3, 0x0000000f, end_half_byte_shifting_loop_1
+
+	move $t7, $t2 # zachowuje lower byte na pozniej
+
+	addiu $a0, $a0, 1
+
+	addiu $t6, $t6, 1
+
+	# jezeli lower jest f, to upper next byte bedzie f
+if_lower_byte_is_f_1:
+	bne $t7, 0x0000000f, skip_if_lower_byte_1
+
+	li $t7, 0x000000f0
+	sb $t7, 0($a0)
+
+	j end_half_byte_shifting_loop_1
+
+skip_if_lower_byte_1:
+
+	j half_byte_shifting_loop_1
+
+end_half_byte_shifting_loop_1:
+
+	subu $a0, $a0, $t6 # powrot na poczatek arraya
+
+
+	li $t0, 0 # parzystosc
+	li $t1, 0 # temp
+
+inf_pre_loop_2:
+	bne $t0, 0, end_inf_pre_loop_2
+	
+	lbu $t1, 0($a1)
+
+	li $t2, 0 # lower byte
+	li $t3, 0 # upper byte
+	andi $t2, $t1, 0x0000000f
+	andi $t3, $t1, 0x000000f0
+
+	beq $t3, 0, inf_pre_else_upper_2
+
+	j end_inf_pre_loop_2
+
+inf_pre_else_upper_2:
+
+	beq $t2, 0, inf_pre_else_lower_2
+
+	li $t0, 1
+
+	j end_inf_pre_loop_2
+
+inf_pre_else_lower_2:
+
+	addiu $a1, $a1, 1
+
+	j inf_pre_loop_2
+
+end_inf_pre_loop_2:
+
+	li $t7, 0 # zmienna tymczasowa
+	lbu $t7, 0($a1)
+	andi $t7, $t7, 0x0000000f
+	li $t6, 0 # licznik przesuniec adresu
+
+half_byte_shifting_loop_2:
+	beq $t0, 0, end_half_byte_shifting_loop_2
+
+	addiu $a1, $a1, 1 # bierzemy nastepny bajt
+
+	lbu $t1, 0($a1)
+	li $t2, 0 # lower byte
+	li $t3, 0 # upper byte
+	andi $t2, $t1, 0x0000000f
+	andi $t3, $t1, 0x000000f0
+
+	srl $t3, $t3, 4
+
+	subiu $a1, $a1, 1
+
+	sll $t7, $t7, 4
+
+	or $t7, $t7, $t3
+
+	sb $t7, 0($a1)
+
+if_upper_byte_is_f_2:
+	beq $t3, 0x0000000f, end_half_byte_shifting_loop_2
+
+	move $t7, $t2
+
+	addiu $a1, $a1, 1
+	addiu $t6, $t6, 1
+
+if_lower_byte_is_f_2:
+	bne $t7, 0x0000000f, skip_if_lower_byte_2
+
+	li $t7, 0x000000f0
+	sb $t7, 0($a1)
+
+	j end_half_byte_shifting_loop_2
+
+skip_if_lower_byte_2:
+
+	j half_byte_shifting_loop_2
+
+end_half_byte_shifting_loop_2:
+
+	subu $a1, $a1, $t6 # powrot na poczatek arraya
+	
+	# KONIEC USUWANIA NIEZNACZACYCH ZER
+
+	# MIERZENIE DLUGOSCI
 	li $t0, 0 # temp_value
 	li $t1, 0 # second_temp_value
 	
@@ -13,10 +191,8 @@
 	li $t6, 0 # first_half_byte_size
 	li $t5, 0 # second_byte_size
 	li $t4, 0 # second_half_byte_size
-	
-	# MIERZENIE DLUGOSCI
-	la $a0, first # adres elementu w first
-inf_loop_1:
+
+inf_loop_1:	
 	lbu $t1, 0($a0) # wartosc pod adresem
 	li $t2, 0 # lower byte
 	li $t3, 0 # upper byte
@@ -44,8 +220,6 @@ if_else_2:
 	
 end_inf_loop1:
 
-		
-	la $a1, second # adres elementu w second
 inf_loop_2:
 	lbu $t1, 0($a1)
 	li $t2, 0
@@ -114,8 +288,8 @@ if_else_half_even:
 
 	subiu $t1, $t1, 1 # zamiana sizu na indeks
 
-	la $t2, result # adres wyniku
-	addu $t2, $t2, $t1 # przejscie na koniec wyniku
+	la $a2, result # adres wyniku
+	addu $a2, $a2, $t1 # przejscie na koniec wyniku
 	subiu $t0, $t0, 1 # miejsce na koniec liczby
 	
 	li $t7, 0 # dlugosci sie zwolily bo mam adresy
@@ -193,15 +367,15 @@ skip_fix:
 	mfhi $t3
 	
 	bne $t3, 0, max_half_byte_size_not_even # gdy parzysty lower byte
-	sb $t5, 0($t2) # zapisanie wyniku
+	sb $t5, 0($a2) # zapisanie wyniku
 	j max_half_byte_size_not_even_skip
 	
 max_half_byte_size_not_even:
 	sll $t5, $t5, 4
-	lbu $a3, 0($t2)
+	lbu $a3, 0($a2)
 	or $t5, $t5, $a3 # adjust i dodawanie upper byte
-	sb $t5, 0($t2) # zapisanie wyniku
-	subiu $t2, $t2, 1
+	sb $t5, 0($a2) # zapisanie wyniku
+	subiu $a2, $a2, 1
 
 max_half_byte_size_not_even_skip:
 
@@ -210,7 +384,7 @@ max_half_byte_size_not_even_skip:
 	
 end_add_loop:
 
-	addiu $t2, $t2, 1 # naprawiam - wskazuje teraz na indeks 0
+	addiu $a2, $a2, 1 # naprawiam - wskazuje teraz na indeks 0
 	
 	# Wolne rejestry
 	# t7 ma carry_over
@@ -249,25 +423,25 @@ shifting:
 	
 	li $t3, 0 # tu przechowujemy zmienna tymczasowa
 	subiu $t1, $t1, 1 # do iteracji zamieniamy size na indeks
-	addu $t2, $t2, $t1 # ostatnia pozycja w tablicy
+	addu $a2, $a2, $t1 # ostatnia pozycja w tablicy
 	
 even_shifting_loop:
 	bleu $t1, 0, end_even_shifting_loop
 	
-	subiu $t2, $t2, 1
-	lbu $t0, 0($t2) # lower byte
-	lbu $t5, 0($t2) # upper byte
-	addiu $t2, $t2, 1
+	subiu $a2, $a2, 1
+	lbu $t0, 0($a2) # lower byte
+	lbu $t5, 0($a2) # upper byte
+	addiu $a2, $a2, 1
 	
 	andi $t0, $t0, 0x0000000f
 	andi $t5, $t5, 0x000000f0
 	srl $t5, $t5, 4
 	sll $t0, $t0, 4
 	or $t0, $t0, $t3
-	sb $t0, 0($t2)
+	sb $t0, 0($a2)
 	move $t3, $t5
 	
-	subiu $t2, $t2, 1
+	subiu $a2, $a2, 1
 	subiu $t1, $t1, 1
 
 	j even_shifting_loop
@@ -275,7 +449,7 @@ even_shifting_loop:
 end_even_shifting_loop:
 	# wychodzimy z petli z indeksem 0
 	or $t3, $t3, 0x00000010
-	sb $t3, 0($t2)
+	sb $t3, 0($a2)
 
 	j end_shifting
 	
@@ -285,26 +459,26 @@ not_even_shifting:
 not_even_shifting_loop:
 	bleu $t1, 0, end_not_even_shifting_loop
 	
-	lbu $t0, 0($t2) # lower byte
-	lbu $t5, 0($t2) # upper byte
+	lbu $t0, 0($a2) # lower byte
+	lbu $t5, 0($a2) # upper byte
 	
 	andi $t0, $t0, 0x0000000f
 	andi $t5, $t5, 0x000000f0
 	
 	srl $t5, $t5, 4
 	or $t5, $t5, $t3
-	sb $t5, 0($t2)
+	sb $t5, 0($a2)
 	move $t3, $t0
 	
 	subiu $t1, $t1, 1
-	addiu $t2, $t2, 1
+	addiu $a2, $a2, 1
 	
 	j not_even_shifting_loop
 	
 end_not_even_shifting_loop:
 
 	# poprawka do indeksu tablicy
-	subu $t2, $t2, $t7
+	subu $a2, $a2, $t7
 
 end_shifting:
 
@@ -317,7 +491,7 @@ end_shifting:
 	move $t7, $s7 # carry_over
 	
 	subiu $t1, $t1, 1 # zamiana sizu na indeks
-	addu $t2, $t2, $t1 # wskazuje na koniec wyniku
+	addu $a2, $a2, $t1 # wskazuje na koniec wyniku
 	
 	divu $t0, $t0, 2
 	mfhi $t0
@@ -328,7 +502,7 @@ end_shifting:
 
 carry_over_even_fix_f:
 	li $t0, 0x000000f0 # jezeli nie, na poczatek
-	sb $t0, 0($t2)
+	sb $t0, 0($a2)
 	j end_even_fix_f
 	
 carry_over_uneven_fix_f:
@@ -337,13 +511,13 @@ even_fix_f:
 	beq $t7, 1, carry_over_even_fix_f
 	li $t7, 0
 	li $t0, 0
-	lbu $t0, 0($t2)
+	lbu $t0, 0($a2)
 	ori $t0, $t0, 0x0000000f
-	sb $t0, 0($t2)
+	sb $t0, 0($a2)
 
 end_even_fix_f:
 
-	subu $t2, $t2, $t1 # poczatek arraya
+	subu $a2, $a2, $t1 # poczatek arraya
 
 	# KONIEC FIXA
 	
@@ -357,7 +531,7 @@ print_loop:
 	li $t0, 0
 inner_print_loop:
 	bgeu $t0, 8, inner_print_loop_end
-	lbu $t3, 0($t2) # wczytuje bajt wyniku
+	lbu $t3, 0($a2) # wczytuje bajt wyniku
 	li $t5, 0
 	subu $t5, $t0, 7
 	mul $t5, $t5, -1
@@ -373,7 +547,7 @@ inner_print_loop:
 
 inner_print_loop_end:
 
-	addiu $t2, $t2, 1 # przejscie do kolejnego bajtu
+	addiu $a2, $a2, 1 # przejscie do kolejnego bajtu
 	subiu $t1, $t1, 1
 	
 	j print_loop
