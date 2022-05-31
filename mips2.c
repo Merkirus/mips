@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <stdint.h>
 
-unsigned char first[] = {0x91,0x5f};
-unsigned char second[] = {0x10, 0x85, 0xf0};
+unsigned char first[] = {0x99,0x99,0xf0};
+unsigned char second[] = {0x1f};
 
 void dodBCD();
 
