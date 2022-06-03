@@ -3,7 +3,7 @@
 .data
 sys_stack_addr: .word 0
 stack: .space STACK_SIZE
-array: .word 1,2,3,4,5,6,7,8,9,10
+array: .word 1,2,3,4,5,6,7,8,9,10,11
 
 .text
 
@@ -11,6 +11,8 @@ array: .word 1,2,3,4,5,6,7,8,9,10
 	sw $sp, sys_stack_addr
 	la $sp, stack+STACK_SIZE
 	
+	subiu $sp, $sp, 4 # wskazuje na ostatni elem. arraya
+
 main:
 	subiu $sp, $sp, 4 # rezerwuje miejsce dla s
 	
@@ -20,14 +22,14 @@ main:
 	subiu $sp, $sp, 4
 	
 	# parametr rozmiaru arraya
-	li $t0, 10
+	li $t0, 11
 	sw $t0, 0($sp)
 	subiu $sp, $sp, 4
 	
 	jal sum
 		
 	lw $t0, 0($sp)
-	subiu $sp, $sp, 12
+	addiu $sp, $sp, 12
 	sw $t0, 0($sp)
 	
 	li $v0, 1
